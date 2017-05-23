@@ -215,7 +215,12 @@ until dict:getIndex(runk) == dict:getUnkIndex()
 
 for sample in dataset() do
     sample.bsz = 1
-    local hypos, scores, attns,times, conv= model:generate(config, sample, searchf)
+    local plp = require('pl.pretty')
+    plp.dump(sample)
+    local input_encode= model:generate(config, sample, searchf ,2)
+    print("input_encode:")
+    --plp.dump(input_encode)
+    local hypos, scores, attns,times, conv= model:generate(config, sample, searchf ,0)
 
     -- Print results
     local sourceString = config.srcdict:getString(sample.source:t()[1])
@@ -224,7 +229,7 @@ for sample in dataset() do
     print('O', sample.text)
     --print(table.concat(sample))
     image = require('image')
-    local plp = require('pl.pretty')
+    
     --plp.dump(scores)
     for i = 1, math.min(config.nbest, config.beam) do
         --print(conv[i])

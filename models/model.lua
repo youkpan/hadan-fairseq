@@ -215,6 +215,7 @@ Returns a function that finalizes generation by performing some transformations.
     end
 }
 
+
 Model.generate = argcheck{
     doc=[[
 Sentence generation. See search.lua for a description of search functions.

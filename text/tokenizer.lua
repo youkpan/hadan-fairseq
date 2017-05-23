@@ -26,6 +26,39 @@ tokenizer.unk = '<unk>'
 tokenizer.tokenize = function(line)
     -- Remove extra whitespace
     local s = line:gsub("\t", ""):gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", " ")
+    --print(type(line))
+    
+    local wordlen = s:sub(1,1)
+    slen = s:len()
+    x = plutils.split(s, ' ')
+    if slen>10 and  (#x < 3)  then
+        wordlen = '3'
+        s = "3"..s
+        slen = slen +1
+    end
+    --print("slen ",slen)
+    if wordlen == '2' then
+        wl = 2
+        local re = {}
+        s = s:sub(2)
+        for i = 1, (slen-1)/wl do
+            table.insert(re,s:sub(1+(i-1)*wl,1+(i)*wl))
+        end
+        --print(re)
+        return re
+    end
+
+    if wordlen == '3' then
+        wl = 3
+        local re = {}
+        s = s:sub(2)
+        for i = 1, (slen-1)/wl do
+            t = s:sub(1+(i-1)*(wl),1+i*(wl))
+            table.insert(re,t:sub(1,3))
+        end
+        --print(re)
+        return re
+    end
     return plutils.split(s, ' ')
 end
 

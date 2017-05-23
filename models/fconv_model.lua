@@ -573,14 +573,19 @@ FConvModel.make = argcheck{
 
         local encoder = self:makeEncoder(config)
         local decoder = self:makeDecoder(config)
+        --local encoder2 = self:makeEncoder(config)
 
         -- Wire up encoder and decoder
         local input = nn.Identity()()
         local targetIn, sourceIn = input:split(2)
+
         local output = decoder({
             targetIn,
             encoder(sourceIn):annotate{name = 'encoder'},
         }):annotate{name = 'decoder'}
+
+        --local encoder2_out = encoder2(sourceIn):annotate{name = 'encoder2'}
+        --aa = nn.gModule({input},{encoder2_out})
 
         return nn.gModule({input}, {output})
     end
@@ -724,14 +729,17 @@ FConvModel.generationDecode = argcheck{
     {name='self', type='FConvModel'},
     {name='config', type='table'},
     {name='bsz', type='number'},
-    call = function(self, config, bsz)
+    call = function(self, config, bsz,typee)
         local softmax = nn.SoftMax():type(self:type())
         local m = self:network()
         local convlm = mutils.findAnnotatedNode(m, 'convlm')
+        --local encoder = mutils.findAnnotatedNode(m, 'encoder')
+
         local outmodule = mutils.findAnnotatedNode(m, 'outmodule')
         local maxContext = self.decoderContext
         local pad = config.dict:getPadIndex()
-
+        print("generationDecode")
+         
         return function(state, targetIn)
             if state.remapFn then
                 targetIn:apply(state.remapFn)
@@ -739,6 +747,8 @@ FConvModel.generationDecode = argcheck{
 
             -- Prepare decoder input.
             local input, inputPos = table.unpack(state.inputBuf)
+
+
             local fist_conv = 0
             if input:dim() == 0 then
                 local targetInView = targetIn:view(-1, 1)
@@ -753,7 +763,14 @@ FConvModel.generationDecode = argcheck{
                     -- The convolutional LM has an explicit state;
                     -- we need only the last generated (token, position).
                     input:copy(targetIn)
+
+                    --print("targetIn ")
+                    --print(targetIn)
                     inputPos:add(1)
+
+                    --print("encoderout:")
+                    --encoderout = encoder:forward({input, inputPos})
+                    --plp.dump(encoderout)
                 else
                     --print("! state.convStates")
                     -- The convolutional LM doesn't have an explicit state;
@@ -777,6 +794,8 @@ FConvModel.generationDecode = argcheck{
                     end
                 end
             end
+
+
 
             local cout = convlm:forward({state.inputBuf, state.encoderOut})
             cout = cout:narrow(2, cout:size(2), 1) -- take last step

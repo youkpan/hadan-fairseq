@@ -58,12 +58,14 @@ EnsembleModel.make = argcheck{
     end
 }
 
+
 EnsembleModel.generate = argcheck{
     {name='self', type='EnsembleModel'},
     {name='config', type='table'},
     {name='sample', type='table'},
     {name='search', type='table'},
-    call = function(self, config, sample, search)
+    {name='typee', type='number'},
+    call = function(self, config, sample, search ,typee)
         local dict = config.dict
         local minlen = config.minlen
         local maxlen = config.maxlen
@@ -81,8 +83,9 @@ EnsembleModel.generate = argcheck{
 
         local callbacks = {}
         for _, model in ipairs(self.models) do
-            table.insert(callbacks, model:generationCallbacks(config, bsz))
+            table.insert(callbacks, model:generationCallbacks(config, bsz  ))
         end
+
 
         for _, timer in pairs(timers) do
             timer:stop()
@@ -117,6 +120,8 @@ EnsembleModel.generate = argcheck{
         for i = 1, #self.models do
             targetIns[i] = torch.Tensor(bbsz):type(self:type())
             targetIns[i]:fill(dict:getEosIndex())
+            --print("targetIns[i]")
+            --print(targetIns[i])
         end
 
         search.init(bsz, sample)
@@ -131,7 +136,9 @@ EnsembleModel.generate = argcheck{
         --plp.dump(conv)
         local conv_all
         image = require('image')
-        print(' start steps ')
+        --print(' start steps ')
+        local conv1
+
         -- We do maxlen + 1 steps to give model a chance to predict EOS
         for step = 1, maxlen + 1 do
             timers.decoder:resume()
@@ -141,7 +148,21 @@ EnsembleModel.generate = argcheck{
             local conv3
 
             for i = 1, #self.models do
-                local softmax,conv = callbacks[i].decode(states[i], targetIns[i])
+                if typee == 2 then
+                    --print("sample.source")
+                    --print(sample.source)
+
+                    local m = self.models[1]:network()
+                    local mutils = require 'fairseq.models.utils'
+                    local encoder = mutils.findAnnotatedNode(m, 'encoder')
+                    encoderout = encoder:forward({sample.source, sample.sourcePos})
+                    return encoderout
+                    
+                    --conv1 = callbacks[i].decode(states[i], targetIns[i],2)
+                    --return conv1
+                end
+
+                local softmax,conv = callbacks[i].decode(states[i], targetIns[i],1)
                 conv3 = conv
                 --print(conv)
                 aggSoftmax:add(softmax)
@@ -154,9 +175,9 @@ EnsembleModel.generate = argcheck{
             img=img:resize(40,32)
             img = img - img:min()
             img = img / img:max()
-            img = image.scale(img,800,640)
-            path1=string.format('/home/pan/conv_step_%d.jpg',step)
-            image.saveJPG(path1,img)
+            --img = image.scale(img,800,640)
+            --path1=string.format('/home/pan/conv_step_%d.jpg',step)
+            --image.saveJPG(path1,img)
             --]]--
             
             if step == 3 then
@@ -222,21 +243,6 @@ EnsembleModel.generate = argcheck{
         --plp.dump(results[2])
         --print("inex")
         --plp.dump(results[4])
-
-        image = require('image')
-        local img =  torch.FloatTensor(conv_all:size()):copy(conv_all)
-        img=img:resize(conv_all:size(1),conv_all:size(3))
-        best_index = results[4][1]
-        line_pix = conv_all:size(3)
-        local img2 = img[best_index]
-        img2 = img2:resize(16,16)
-        
-        img2 = img2 - img2:min()
-        img2 = img2 / img2:max()
-        --print(img2)
-        img2 = image.scale(img2,16*40,16*40)
-        image.saveJPG("/home/pan/test.jpg",img2)
-        print("conv at 3 step image.saveJPG /home/pan/test.jpg")
         --plp.dump(results)
         return table.unpack(results)
     end

@@ -320,11 +320,16 @@ search.beam = argcheck{
         else
             bdist = ldistp:view(bsz, ldistp:size(2) * beam)
         end
+
         topScores, topIndices = clib.topk(
             topScores, topIndices, bdist, beam * 2)
         topIndices:add(-1)
         local selScores, selIndices = selectHypos(step, bsz,
             topScores:float(), topIndices:float(), vocabsize)
+
+        --print("step:",step," selScores selIndices:")
+        --print(selScores)
+        --print(selIndices)
 
         -- Determine actual dictionary indices and hidden state propagation
         -- indices.
@@ -333,6 +338,10 @@ search.beam = argcheck{
         local nextHid = torch.div(selIndices1, vocabsize)
         nextHid = nextHid + hidOffsets
         hscores = mutils.sendtobuf(selScores:view(-1), scoresBuf)
+
+        --print(" nextIn nextHid:")
+        --print(nextIn)
+        --print(nextHid)
 
         table.insert(outs, nextIn)
         table.insert(backp, nextHid)
