@@ -169,14 +169,14 @@ EnsembleModel.generate = argcheck{
                     end
                     local tmp = torch.range(starti, findsize+starti,1):resize(findsize,1)
                     source = torch.IntTensor(findsize,1):copy(tmp)
-                    tmp = torch.range(1, findsize):resize(findsize,1)
+                    tmp = torch.ones(findsize):resize(findsize,1)
                     sourcePos = torch.IntTensor(findsize,1):copy(tmp)
 
                     --local tmp = (torch.ones(20)*starti):resize(20,1)
                     --source = torch.IntTensor(20,1):copy(tmp)
                     --tmp = torch.range(1, 20):resize(20,1)
                     --sourcePos = torch.IntTensor(20,1):copy(tmp)
-                    if starti %1000 == 1 then
+                    if starti %1000 == 2 then
                         print ("getting word vector",starti)
                     end
 
@@ -215,7 +215,7 @@ EnsembleModel.generate = argcheck{
 
             end
 
-            src_disc_map = src_disc_map:resize(src_disc_map:size(2),src_disc_map:size(3))
+            src_disc_map = src_disc_map:resize(srcvocabsize,src_disc_map:size(3))
             src_disc_map = src_disc_map:t()
 
             --plp.dump(src_disc_map)
@@ -233,7 +233,7 @@ EnsembleModel.generate = argcheck{
             --srcsoftmax = src_v --[step]
             srcsoftmax0  = srcsoftmax
             --print(srcsoftmax:size())
-            srcsoftmax = torch.CudaDoubleTensor(srcsoftmax:size()):copy(srcsoftmax)
+            --srcsoftmax = torch.CudaDoubleTensor(srcsoftmax:size()):copy(srcsoftmax)
             srcsoftmax_v = {}
             for k=1 , srcsoftmax:size(1) do
                 srcsoftmax_v[k] = torch.CudaDoubleTensor(srcsoftmax:size(3)):copy(srcsoftmax[k])
@@ -248,9 +248,21 @@ EnsembleModel.generate = argcheck{
             local index_t =torch.CudaLongTensor(0)
             --predict_index = {}
             local aggAttnScores = torch.zeros(bbsz, sourceLen+1):type(self:type())
-            for step = 1, sourceLen do
+            for step = 1, sourceLen-1 do
+                local srcsoftmax1
+                if step == 1 then
+                    srcsoftmax1 = srcsoftmax_v[1]
+                    last_srcsoftmax = 0
+                    last_srcsoftmax2 = 0
+                elseif step == 2 then
+                    srcsoftmax1 = srcsoftmax_v[2] -- srcsoftmax_v[1]
+                else
+                    srcsoftmax1 = srcsoftmax_v[step] - 0.2*last_srcsoftmax - 0.2*last_srcsoftmax2
+                end
+                 
+                last_srcsoftmax = last_srcsoftmax2
+                last_srcsoftmax2 = srcsoftmax1
 
-                local srcsoftmax1 = srcsoftmax_v[step]
                 aggAttnScores:zero()
                 aggSoftmax:zero()
                 idx = step
@@ -286,7 +298,7 @@ EnsembleModel.generate = argcheck{
                 --plp.dump(topIndices)
                 --print("topScores",max)
                 --print("index",index)
-                if index[1] > 10000 then
+                if index[1] > srcvocabsize or index[1] < 0 then
                     index = torch.CudaLongTensor(1):fill(1)
                 end
 
@@ -346,10 +358,10 @@ EnsembleModel.generate = argcheck{
                 end
             end
             
-            local img =  torch.FloatTensor(conv3:size()):copy(conv3)
-            img=img:resize(40,32)
-            img = img - img:min()
-            img = img / img:max()
+            --local img =  torch.FloatTensor(conv3:size()):copy(conv3)
+            --img=img:resize(40,32)
+            --img = img - img:min()
+            --img = img / img:max()
             --img = image.scale(img,800,640)
             --path1=string.format('/home/pan/conv_step_%d.jpg',step)
             --image.saveJPG(path1,img)
