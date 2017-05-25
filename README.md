@@ -37,8 +37,9 @@ someone knows how to get the layer param and the way improve the vector to word 
  for max speed limit the sentence len 75
 
 
- our early work in 
- [predict sentence score :](http://f.hayoou.com/blogs/entry/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-caffe-%E6%B5%8B%E8%AF%95%E4%B8%AD)
+ our early work :
+ 
+ [predict sentence score](http://f.hayoou.com/blogs/entry/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-caffe-%E6%B5%8B%E8%AF%95%E4%B8%AD)
 
  [AI-GO (game):](http://f.hayoou.com/blogs/entry/hayoou-AI-GO-%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD%E5%9B%B4%E6%A3%8B)
 
