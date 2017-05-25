@@ -6,6 +6,7 @@ and using this vectors to get detail of the sentence.
 We make a script to generate [sentence image], 
 and use tensorflow to train the image to predict the info
 in next sentence .
+the tensorflow project (https://github.com/youkpan/hadan-tf)
 
 and also try to gen words back ,using the predict vector,
 but now facing a problem ,we can't access the hidden layer of dictionary.
