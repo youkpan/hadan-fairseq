@@ -47,6 +47,7 @@ local function topk(top, ind, val, k)
     else
         top, ind = top or torch.FloatTensor(), ind or torch.LongTensor()
         local len, n = val:size(2), val:size(1)
+        print("clib len ",len,"n",n)
         top:resize(n, k)
         ind:resize(n, k)
         assert(top:isContiguous() and ind:isContiguous())

@@ -306,7 +306,7 @@ ResumableDPOptimEngine.doTrain = argcheck{
         local jumping = state.jumped < state.t
 
         self.hooks('onStart', state)
-        while state.epoch < state.maxepoch do
+        while state.epoch < 1000 do
             self:training()
 
             jumping = jumping and state.jumped < state.epoch_t

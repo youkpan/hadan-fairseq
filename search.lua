@@ -289,19 +289,114 @@ search.beam = argcheck{
         topIndices = torch.CudaLongTensor()
     end
     local scoresBuf = torch.Tensor():type(ttype)
+
+    f.prune2 = function(step, ldist, attnscores)
+        local maxScores = torch.Tensor():type(ttype)
+        --ldist = torch.Tensor(ldist:size()):copy(ldist)
+        local maxIndices = torch.CudaLongTensor()
+        maxScores, maxIndices = torch.topk(maxScores, maxIndices, ldist, 1, 2,
+            true)
+        return maxScores, maxIndices
+--[[
+        local maxScoresV = maxScores:view(-1)
+        local maxIndicesV = maxIndices:view(-1)
+
+
+        local as = torch.FloatTensor(attnscores:size()):copy(attnscores)
+        table.insert(ascores, as)
+
+        local vocabsize = ldist:size(2)
+        --print('vocabsize',vocabsize)
+        local plp = require('pl.pretty') 
+        --plp.dump(ldist)
+        --print("ldist sizse",ldist:size())
+        
+        bpenalties = torch.expand(penalties:view(1, -1), step,
+            dict:size())
+        --print(bpenalties:narrow(2, 1, vocabsize):size())
+        local ldistp = ldist:add(bpenalties:narrow(2, 1, vocabsize)):t()
+        --print('ldistp',ldistp)
+        -- Add log-probs of hypotheses at the previous time-step so ldistp will
+        -- represent the total log-probability for each new hypothesis.
+
+        hscores:resize(step):fill(0)
+        --print ('hscores size',hscores:size())
+        ldistp:addr(1, ones:narrow(1, 1, vocabsize), hscores)
+        ldistp = ldistp:t()
+        --print(ldistp:size())
+
+        local bsz =1 -- ldistp:size(1) / beam
+        --print("bsz",bsz,'ldistp size')
+        --print(ldistp:size())
+        -- Select candidate hypotheses.
+        -- The model produces a (bsz * beam X vocabsize) tensor, but for
+        -- pruning we'll work with a (bsz X beam * vocabsize) tensor. This
+        -- makes it possible to use a single topk() call.  Whenever we work
+        -- with the top indices later, it's important to remember that they
+        -- refer to a beam * vocabsize slice, i.e.  the actual symbol
+        -- index is (index-1 % vocabsize) + 1, while the candidate in the
+        -- beam the new hypothesis was produced from is floor(index /
+        -- vocabsize + 1.
+        local bdist
+        if step == 1 then
+            -- For the first step, all hypotheses are equal (they start from the
+            -- same token) so we simply select candidates from the first one in
+            -- the beam.
+            bdist = ldistp:unfold(1, 1, beam):squeeze(3)
+        else
+            bdist = ldistp:view(bsz, ldistp:size(2) * step)
+        end
+        --print('start clib')
+        --print('ldistp size')
+        --print(ldistp:size())
+        topScores, topIndices = clib.topk(
+            topScores, topIndices, bdist, beam * 2)
+        --plp.dump(topIndices)
+
+        --print("topIndices")
+        --plp.dump(topIndices)
+        --print("topScores")
+        --print(topScores)
+        topIndices:add(-1)
+        --[[
+        local selScores, selIndices = selectHypos(step, bsz,
+            topScores:float(), topIndices:float(), vocabsize)
+
+        --print("step:",step," selScores selIndices:")
+        --print(selScores)
+        --print(selIndices)
+
+        -- Determine actual dictionary indices and hidden state propagation
+        -- indices.
+        local selIndices1 = selIndices:view(-1)
+        local nextIn = torch.remainder(selIndices1, vocabsize) + 1
+        local nextHid = torch.div(selIndices1, vocabsize)
+        nextHid = nextHid + hidOffsets
+        hscores = mutils.sendtobuf(selScores:view(-1), scoresBuf)
+--]
+        return topScores,topIndices
+
+        ]]
+    end
     f.prune = function(step, ldist, attnscores)
         local as = torch.FloatTensor(attnscores:size()):copy(attnscores)
         table.insert(ascores, as)
 
         local vocabsize = ldist:size(2)
+        --print('vocabsize',vocabsize)
+        local plp = require('pl.pretty') 
+        --plp.dump(ldist)
+        --print("ldist sizse",ldist:size())
+        --print(bpenalties:narrow(2, 1, vocabsize):size())
         local ldistp = ldist:add(bpenalties:narrow(2, 1, vocabsize)):t()
-        
+        --print('ldistp',ldistp)
         -- Add log-probs of hypotheses at the previous time-step so ldistp will
         -- represent the total log-probability for each new hypothesis.
         ldistp:addr(1, ones:narrow(1, 1, vocabsize), hscores)
         ldistp = ldistp:t()
         local bsz = ldistp:size(1) / beam
-
+        --print("bsz",bsz,'ldistp size')
+        --print(ldistp:size())
         -- Select candidate hypotheses.
         -- The model produces a (bsz * beam X vocabsize) tensor, but for
         -- pruning we'll work with a (bsz X beam * vocabsize) tensor. This
@@ -320,9 +415,16 @@ search.beam = argcheck{
         else
             bdist = ldistp:view(bsz, ldistp:size(2) * beam)
         end
-
+        --print('start clib')
+        --print('ldistp size')
+        --print(ldistp:size())
         topScores, topIndices = clib.topk(
             topScores, topIndices, bdist, beam * 2)
+        
+        --print("topIndices")
+        --plp.dump(topIndices)
+        --print("topScores")
+        --print(topScores)
         topIndices:add(-1)
         local selScores, selIndices = selectHypos(step, bsz,
             topScores:float(), topIndices:float(), vocabsize)
@@ -367,6 +469,7 @@ search.beam = argcheck{
             assert(#v == beam, string.format(
                 "beam search didn't return enough hypotheses: %d", #v)
             )
+
             local v2 = {}
             for j = 1, beam do
                 v2[j] = { 

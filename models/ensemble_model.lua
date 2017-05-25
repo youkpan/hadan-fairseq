@@ -26,10 +26,19 @@ EnsembleModel.__init = argcheck{
     {name='self', type='EnsembleModel'},
     {name='config', type='table'},
     call = function(self, config)
-        local paths = plstringx.split(config.path, ',')
-        self.models = {}
-        for i, path in pairs(paths) do
-            self.models[i] = torch.load(path)
+
+        if config.uesmodel == 4 then
+            local paths = plstringx.split(config.path2, ',')
+            self.models = {}
+            for i, path in pairs(paths) do
+                self.models[i] = torch.load(path)
+            end
+        else
+            local paths = plstringx.split(config.path, ',')
+            self.models = {}
+            for i, path in pairs(paths) do
+                self.models[i] = torch.load(path)
+            end
         end
     end
 }
@@ -65,8 +74,10 @@ EnsembleModel.generate = argcheck{
     {name='sample', type='table'},
     {name='search', type='table'},
     {name='typee', type='number'},
-    call = function(self, config, sample, search ,typee)
+    {name='srcsoftmax', type='torch.CudaTensor'},
+    call = function(self, config, sample, search ,typee ,srcsoftmax)
         local dict = config.dict
+        local srcdict = config.srcdict
         local minlen = config.minlen
         local maxlen = config.maxlen
         local sourceLen = sample.source:size(1)
@@ -127,12 +138,172 @@ EnsembleModel.generate = argcheck{
         search.init(bsz, sample)
         local vocabsize =
             sample.targetVocab and sample.targetVocab:size(1) or dict:size()
+        local srcvocabsize =  srcdict:size()   
         local aggSoftmax = torch.zeros(bbsz, vocabsize):type(self:type())
+        local aggSoftmax_s = torch.zeros(bbsz, srcvocabsize):type(self:type())
         local aggAttnScores = torch.zeros(bbsz, sourceLen):type(self:type())
+        local plp = require('pl.pretty')
+        if typee == 4 then
+            local m = self.models[1]:network()
+            local mutils = require 'fairseq.models.utils'
+            local encoder = mutils.findAnnotatedNode(m, 'encoder')
+            local aggSoftmax = torch.zeros(sourceLen, srcvocabsize):type(self:type())
+            --sourcePos={}
+            --sample.source = {}
+            --print(sample.source)
+            --print("sourcePos")
+            --print(sample.sourcePos)
+            require('cutorch')
+            findsize = 1000
+            src_disc_map = nil -- config.src_disc_map
+            if src_disc_map==nil then
+                src_disc_map=torch.CudaDoubleTensor(0)
+                config.src_disc_map2 = {}
+                for k=1 ,20 do
+                    config.src_disc_map2[k] = torch.CudaDoubleTensor(0)
+                    --k pos ,word vector
+                end
+                for starti = 1, srcvocabsize,1000  do
+                    if starti == 6001 then --6204
+                        findsize = 204
+                    end
+                    local tmp = torch.range(starti, findsize+starti,1):resize(findsize,1)
+                    source = torch.IntTensor(findsize,1):copy(tmp)
+                    tmp = torch.range(1, findsize):resize(findsize,1)
+                    sourcePos = torch.IntTensor(findsize,1):copy(tmp)
+
+                    --local tmp = (torch.ones(20)*starti):resize(20,1)
+                    --source = torch.IntTensor(20,1):copy(tmp)
+                    --tmp = torch.range(1, 20):resize(20,1)
+                    --sourcePos = torch.IntTensor(20,1):copy(tmp)
+                    if starti %1000 == 1 then
+                        print ("getting word vector",starti)
+                    end
+
+                    src_disc_map2 = encoder:forward({source, sourcePos})
+                    ----print(type(src_disc_map2[1]))
+                    ----print(src_disc_map2[1]:size())
+                    --print("src_disc_map2[1] size",src_disc_map2[1]:size())
+
+                    src_disc_map = src_disc_map:cat(torch.CudaDoubleTensor(src_disc_map2[1]:size()):copy(src_disc_map2[1]),1)
+                    --[[
+                    for k=1 ,20 do
+                        --src_disc_map2 = torch.CudaDoubleTensor(src_disc_map:size(2),src_disc_map:size(3)):copy(src_disc_map[k])
+                        --src_disc_map2 = src_disc_map2:resize(src_disc_map:size(2),src_disc_map:size(3))
+                        --print("src_disc_map2[1]k size",src_disc_map2[1][k]:size())
+                        -- 1x256
+                        local posvector = torch.CudaDoubleTensor(1,src_disc_map2[1]:size(3)):copy(src_disc_map2[1][k]) 
+                        posvector = posvector:resize(src_disc_map2[1]:size(2),src_disc_map2[1]:size(3))--1x256
+                        --posvector = posvector/3 --kwidth
+                        config.src_disc_map2[k] = config.src_disc_map2[k]:cat(posvector,1)
+                        --k pos ,word vector
+                    end
+                    ]]
+                    --print("src_disc_map:size",src_disc_map:size())
+                end
+                --[[
+                    for k=1 ,20 do
+                        config.src_disc_map2[k] = config.src_disc_map2[k]:t()
+                    end
+                    --]]
+                --config.src_disc_map = src_disc_map
+                --config.src_disc_map = 1
+
+
+            else
+                --src_disc_map = src_disc_map:resize(srcvocabsize,srcsoftmax:size(3))
+
+            end
+
+            src_disc_map = src_disc_map:resize(src_disc_map:size(2),src_disc_map:size(3))
+            src_disc_map = src_disc_map:t()
+
+            --plp.dump(src_disc_map)
+            --print("bbsz",bbsz)
+            
+            --EnsembleModel
+            local aggAttnScores2 = torch.CudaDoubleTensor(bbsz, sourceLen):type(self:type()):fill(0)
+            local srcdict_2 = torch.CudaDoubleTensor(srcvocabsize):type(self:type())
+            for j=1,srcvocabsize do
+                ----print(srcdict[j])
+                --srcdict_2[j]=encoderout[1][j]
+            end
+            --print("srcsoftmax type ",type(srcsoftmax))
+
+            --srcsoftmax = src_v --[step]
+            srcsoftmax0  = srcsoftmax
+            --print(srcsoftmax:size())
+            srcsoftmax = torch.CudaDoubleTensor(srcsoftmax:size()):copy(srcsoftmax)
+            srcsoftmax_v = {}
+            for k=1 , srcsoftmax:size(1) do
+                srcsoftmax_v[k] = torch.CudaDoubleTensor(srcsoftmax:size(3)):copy(srcsoftmax[k])
+                srcsoftmax_v[k] = srcsoftmax_v[k]:resize(srcsoftmax:size(1),srcsoftmax:size(3))
+            end
+
+            --print(srcsoftmax_v[1])
+            --srcsoftmax = srcsoftmax:resize(srcsoftmax:size(1),srcsoftmax:size(3))
+
+
+            local pruned 
+            local index_t =torch.CudaLongTensor(0)
+            --predict_index = {}
+            local aggAttnScores = torch.zeros(bbsz, sourceLen+1):type(self:type())
+            for step = 1, sourceLen do
+
+                local srcsoftmax1 = srcsoftmax_v[step]
+                aggAttnScores:zero()
+                aggSoftmax:zero()
+                idx = step
+                if idx >sourceLen then
+                    idx = sourceLen
+                end
+                aggAttnScores[1]=1.0
+
+                --print("srcsoftmax size ",srcsoftmax1:size(),srcsoftmax1:type())
+                --print("src_disc_map2 size ",config.src_disc_map2[step]:size())
+
+                srcsoftmax2 = srcsoftmax1 * src_disc_map
+                --print("srcsoftmax2 size ",srcsoftmax2:size())
+                --print("aggSoftmax size ",aggSoftmax:size())
+                local aggSoftmax2 = torch.zeros(sourceLen, srcvocabsize):type(self:type()):copy(srcsoftmax2)
+                --aggSoftmax:add(srcsoftmax2)
+                aggSoftmax2:div(#self.models)
+                local aggLogSoftmax = aggSoftmax2:log()
+                self:updateMinMaxLenProb(aggLogSoftmax, srcdict, 3, minlen, maxlen)
+
+                topScores,topIndices = search.prune2(sourceLen, aggLogSoftmax, aggAttnScores)
+                --predict_index[step] = pruned.nextIn
+                max = topScores[1][1]
+                index = torch.CudaLongTensor(1):fill(topIndices[1][1])
+
+                for k = 2 ,topScores:size(2) do
+                    if max < topScores[1][k] then
+                        max = topScores[1][k]
+                        index = torch.CudaLongTensor(1):fill(topIndices[1][k])
+                    end
+                end
+                --print("type topIndices",type(topIndices))
+                --plp.dump(topIndices)
+                --print("topScores",max)
+                --print("index",index)
+                if index[1] > 10000 then
+                    index = torch.CudaLongTensor(1):fill(1)
+                end
+
+                index_t = index_t:cat(index)
+                --table.insert(index_t,index)
+            end
+                --plp.dump(topScores)
+                --plp.dump(index_t)
+
+            return index_t
+
+        end
+        
 
         --print("generate conv ,#self.models",#self.models)
         --local conv = callbacks[3].decode2(states[3], targetIns[3])
-        local plp = require('pl.pretty')
+        
         --plp.dump(conv)
         local conv_all
         image = require('image')
@@ -156,6 +327,7 @@ EnsembleModel.generate = argcheck{
                     local mutils = require 'fairseq.models.utils'
                     local encoder = mutils.findAnnotatedNode(m, 'encoder')
                     encoderout = encoder:forward({sample.source, sample.sourcePos})
+                    print('ok')
                     return encoderout
                     
                     --conv1 = callbacks[i].decode(states[i], targetIns[i],2)
@@ -165,6 +337,9 @@ EnsembleModel.generate = argcheck{
                 local softmax,conv = callbacks[i].decode(states[i], targetIns[i],1)
                 conv3 = conv
                 --print(conv)
+                --print("-----type softmax",type(softmax))
+                --print("-----size softmax",softmax:size())
+
                 aggSoftmax:add(softmax)
                 if callbacks[i].attention then
                     aggAttnScores:add(callbacks[i].attention(states[i]))
@@ -182,7 +357,7 @@ EnsembleModel.generate = argcheck{
             
             if step == 3 then
                 conv_all = conv3
-                print('get conv_all')
+                --print('get conv_all')
             end
             
             -- Average softmax and attention scores.
@@ -197,7 +372,9 @@ EnsembleModel.generate = argcheck{
             self:updateMinMaxLenProb(aggLogSoftmax, dict, step, minlen, maxlen)
 
             timers.search_prune:resume()
+
             local pruned = search.prune(step, aggLogSoftmax, aggAttnScores)
+
             timers.search_prune:stop()
 
             for i = 1, #self.models do

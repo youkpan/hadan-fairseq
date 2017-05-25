@@ -738,7 +738,7 @@ FConvModel.generationDecode = argcheck{
         local outmodule = mutils.findAnnotatedNode(m, 'outmodule')
         local maxContext = self.decoderContext
         local pad = config.dict:getPadIndex()
-        print("generationDecode")
+        --print("generationDecode")
          
         return function(state, targetIn)
             if state.remapFn then
