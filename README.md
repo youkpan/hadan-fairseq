@@ -1,7 +1,7 @@
 Introduction
 
-This project using fairseq to train [word vectors].
-and using this vectors to get detail of the sentence.
+This project using fairseq to train [sentence vectors]. 
+and using this vectors to predict next sentence info vector
 
 We make a script to generate [sentence image], 
 and use tensorflow to train the image to predict the info
