@@ -3,8 +3,8 @@ Introduction
 This project using fairseq to train [sentence vectors]. 
 and using this vectors to predict next sentence info vector
 
-We make a script to generate [sentence image], 
-and use tensorflow to train the image to predict the info
+We make a script to generate [sentence vector], 
+and use tensorflow to train the vector to predict the info
 in next sentence .
 the tensorflow project (https://github.com/youkpan/hadan-tf)
 
