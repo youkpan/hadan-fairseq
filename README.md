@@ -11,9 +11,6 @@ the tensorflow project (https://github.com/youkpan/hadan-tf)
 and also try to gen words back ,using the predict vector,
 but now facing a problem ,we can't access the hidden layer of dictionary.
 
-we just using a hack way to get the word vector , it can work,
-but not good .only predict some word like 'is' 'me' .
-
 fix get hidden layer problem ,and works well :)
 anyone find new way improve predict the vector and back to word is welcome. 
 my email is youkpan@gmail.com
@@ -37,7 +34,7 @@ train file , 170MB of Chinese novel wuxia allbook.txt.xz download：
 
 -----install
 
- first you should get the fairseq: 
+ first you should follow the fairseq install and use : 
  https://github.com/facebookresearch/fairseq
  then get chinese dataset
  remenber to change ratio 175 in data/prepare-iwslt14.sh  
