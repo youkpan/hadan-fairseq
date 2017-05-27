@@ -228,20 +228,55 @@ end
 sentence_bufer={}
 sentence_bufer_idx = 1
 plp = require('pl.pretty')
-
+count  = 1
 for sample in dataset() do
     sample.bsz = 1
+    local conv = model:generate(config, sample, searchf ,5,torch.CudaTensor(0))
+    local get_index =torch.CudaLongTensor(0)
+    print(config.srcdict:size())
+    for i=1,config.srcdict:size() do
+        get_index = get_index:cat(torch.CudaLongTensor(1):fill(i))
+    end
+    --get_index = get_index:resize(config.srcdict:size(),1)
+    --print(get_index)
+    local get_dict_string = config.srcdict:getString(get_index)
+    print(get_dict_string)
     
+    
+    local plutils = require 'pl.utils'
+
+    file = io.open("/home/pan/fairseq/dict_string", "w")
+    -- sets the default output file as test.lua
+    io.output(file)
+    io.write(get_dict_string)
+
+    io.close(file)
+    --print("11111111")
+    img =  torch.FloatTensor(conv:size()):copy(conv)
+    img2 = img:resize(1,config.srcdict:size(),256)
+    
+    img2 = img2 - img2:min()
+    img2 = img2 / img2:max()
+
+    path1=string.format('/home/pan/fairseq/dict_vector')
+    image.savePGM(path1,img2)
+
+    io.stdout:flush()
+    collectgarbage()
+    return
+
+    --[[
+
     local conv = model:generate(config, sample, searchf ,2,torch.CudaTensor(0))
 
-    for k,v in pairs(conv) do
-        print(k," conv:size",v:size(1),v:size(2),v:size(3))
-    end
+    --for k,v in pairs(conv) do
+--        print(k," conv:size",v:size(1),v:size(2),v:size(3))
+    --end
 
     -- Print results
     local sourceString = config.srcdict:getString(sample.source:t()[1])
     sourceString = sourceString:gsub(seos .. '.*', '')
-    print('S', sourceString)
+    --print('S', sourceString)
 
     --local testi = math.random()*1000
     --testi = math.floor(testi)
@@ -251,13 +286,13 @@ for sample in dataset() do
     sentence_v = {}
 
     sentence_len = conv[1]:size(1)
-    print("sentence_len " ,sentence_len)
+    --print("sentence_len " ,sentence_len)
     sentence_v2 = torch.FloatTensor(256):fill(0.5)
 
     --table.insert(sentence_v,sentence_len_bar)
 
-    if sentence_len >40 then
-        sentence_len = 40
+    if sentence_len >20 then
+        sentence_len = 20
     end
 
     if sentence_len == nil then
@@ -281,12 +316,16 @@ for sample in dataset() do
         --print("sentence_v get")
     end
     --print(sentence_v2)
-    print(sentence_v2:size())
+    --print(sentence_v2:size())
     --print(img2)
     --img2 = image.scale(sentence_v,16*40,16*40)
     --path1=string.format('/home/pan/fairseq/s_%s_p_%d_%s.jpg',testi,i,words)
     path1=string.format('/home/pan/fairseq/sentence/s_%d',sentence_bufer_idx)
-    print(path1)
+
+    if(count%100 == 1 ) then
+        print(path1)
+    end
+    count = count+1
     sentence_bufer_idx = sentence_bufer_idx +1
     --[[
 
@@ -303,14 +342,14 @@ for sample in dataset() do
     sentence_bufer[1] = sentence_bufer[2]
     sentence_bufer[2] = sentence_bufer[3]
     sentence_bufer[3] = sentence_v
-    --]]
+    --] ]
 
     sentence_v2:resize(1,sentence_len+1,256)
     image.savePGM(path1,sentence_v2)
 
     io.stdout:flush()
     collectgarbage()
-    
+    ]]
 --[[
     local hypos, scores, attns = model:generate(config, sample, searchf , 0)
     local sstr=''

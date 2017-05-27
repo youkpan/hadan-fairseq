@@ -163,6 +163,11 @@ EnsembleModel.generate = argcheck{
                     config.src_disc_map2[k] = torch.CudaDoubleTensor(0)
                     --k pos ,word vector
                 end
+
+                local weights0 = encoder:get(2):parameters()[1]
+                local weights = torch.CudaDoubleTensor(weights0:size()):copy(weights0)
+                src_disc_map = weights:t()
+                --[[
                 for starti = 1, srcvocabsize,1000  do
                     if starti == 6001 then --6204
                         findsize = 204
@@ -198,9 +203,15 @@ EnsembleModel.generate = argcheck{
                         config.src_disc_map2[k] = config.src_disc_map2[k]:cat(posvector,1)
                         --k pos ,word vector
                     end
-                    ]]
+                    ] ]
                     --print("src_disc_map:size",src_disc_map:size())
                 end
+
+                    src_disc_map = src_disc_map:resize(srcvocabsize,src_disc_map:size(3))
+                    --6204x256 , to 
+                    src_disc_map = src_disc_map:t()
+                ]]
+
                 --[[
                     for k=1 ,20 do
                         config.src_disc_map2[k] = config.src_disc_map2[k]:t()
@@ -212,11 +223,9 @@ EnsembleModel.generate = argcheck{
 
             else
                 --src_disc_map = src_disc_map:resize(srcvocabsize,srcsoftmax:size(3))
-
             end
 
-            src_disc_map = src_disc_map:resize(srcvocabsize,src_disc_map:size(3))
-            src_disc_map = src_disc_map:t()
+
 
             --plp.dump(src_disc_map)
             --print("bbsz",bbsz)
@@ -236,8 +245,8 @@ EnsembleModel.generate = argcheck{
             --srcsoftmax = torch.CudaDoubleTensor(srcsoftmax:size()):copy(srcsoftmax)
             srcsoftmax_v = {}
             for k=1 , srcsoftmax:size(1) do
-                srcsoftmax_v[k] = torch.CudaDoubleTensor(srcsoftmax:size(3)):copy(srcsoftmax[k])
-                srcsoftmax_v[k] = srcsoftmax_v[k]:resize(srcsoftmax:size(1),srcsoftmax:size(3))
+                srcsoftmax_v[k] = torch.CudaDoubleTensor(srcsoftmax:size(2)):copy(srcsoftmax[k])
+                srcsoftmax_v[k] = srcsoftmax_v[k]:resize(1,srcsoftmax:size(2))
             end
 
             --print(srcsoftmax_v[1])
@@ -257,7 +266,7 @@ EnsembleModel.generate = argcheck{
                 elseif step == 2 then
                     srcsoftmax1 = srcsoftmax_v[2] -- srcsoftmax_v[1]
                 else
-                    srcsoftmax1 = srcsoftmax_v[step] - 0.2*last_srcsoftmax - 0.2*last_srcsoftmax2
+                    srcsoftmax1 = srcsoftmax_v[step] -- 0.2*last_srcsoftmax - 0.2*last_srcsoftmax2
                 end
                  
                 last_srcsoftmax = last_srcsoftmax2
@@ -277,12 +286,24 @@ EnsembleModel.generate = argcheck{
                 srcsoftmax2 = srcsoftmax1 * src_disc_map
                 --print("srcsoftmax2 size ",srcsoftmax2:size())
                 --print("aggSoftmax size ",aggSoftmax:size())
-                local aggSoftmax2 = torch.zeros(sourceLen, srcvocabsize):type(self:type()):copy(srcsoftmax2)
+                local aggSoftmax2 = torch.zeros(1, srcvocabsize):type(self:type()):copy(srcsoftmax2)
                 --aggSoftmax:add(srcsoftmax2)
                 aggSoftmax2:div(#self.models)
                 local aggLogSoftmax = aggSoftmax2:log()
                 self:updateMinMaxLenProb(aggLogSoftmax, srcdict, 3, minlen, maxlen)
 
+                max = srcsoftmax2[1][1]
+                index = torch.CudaLongTensor(1):fill(srcsoftmax2[1][1])
+
+                for k = 1 ,srcvocabsize do
+                    if max < srcsoftmax2[1][k] then
+                        max = srcsoftmax2[1][k]
+                        index = torch.CudaLongTensor(1):fill(k)
+                    end
+                end
+
+                --print("top i",index)
+                --[[
                 topScores,topIndices = search.prune2(sourceLen, aggLogSoftmax, aggAttnScores)
                 --predict_index[step] = pruned.nextIn
                 max = topScores[1][1]
@@ -295,12 +316,13 @@ EnsembleModel.generate = argcheck{
                     end
                 end
                 --print("type topIndices",type(topIndices))
-                --plp.dump(topIndices)
+                plp.dump(topIndices)
                 --print("topScores",max)
                 --print("index",index)
                 if index[1] > srcvocabsize or index[1] < 0 then
                     index = torch.CudaLongTensor(1):fill(1)
                 end
+                ]]
 
                 index_t = index_t:cat(index)
                 --table.insert(index_t,index)
@@ -329,8 +351,17 @@ EnsembleModel.generate = argcheck{
             aggAttnScores:zero()
 
             local conv3
-
+            local i
             for i = 1, #self.models do
+                if typee == 5 then
+                    local m = self.models[1]:network()
+                    local mutils = require 'fairseq.models.utils'
+                    local encoder = mutils.findAnnotatedNode(m, 'encoder')
+                    local weights0 = encoder:get(2):parameters()[1]
+                    local weights = torch.CudaTensor(weights0:size()):copy(weights0)
+
+                    return weights
+                end
                 if typee == 2 then
                     --print("sample.source")
                     --print(sample.source)
@@ -338,9 +369,56 @@ EnsembleModel.generate = argcheck{
                     local m = self.models[1]:network()
                     local mutils = require 'fairseq.models.utils'
                     local encoder = mutils.findAnnotatedNode(m, 'encoder')
-                    encoderout = encoder:forward({sample.source, sample.sourcePos})
-                    print('ok')
-                    return encoderout
+                    --local j 
+                    --plp.dump(encoder)
+                    --print("encoder  size ",encoder:size())
+                    --[[
+                    params, gradParams = encoder:getParameters()
+                    print("encoder size" ,params:size(1))
+
+                    for j=1, encoder:size() do
+                       local params = encoder:get(j):parameters()
+                       if params then
+                         local weights = params[1]
+                         local biases  = params[2]
+                         print("weights j ",j,"size",weights:size())
+                         --n_parameters  = n_parameters + weights:nElement() + biases:nElement()
+                       end
+                    end
+
+                    --print(encoder[1])
+                    for k,v in pairs(encoder) do
+                        --print("encoder ",k,v)
+                    end
+                    for j =  1, 4 do
+                        --local p = encoder.get(encoder)
+                        print("encoder ",j," size ",encoder[j]:size())
+                    end 
+
+                    ]]
+
+                    local weights0 = encoder:get(2):parameters()[1]
+
+                    local weights = torch.CudaTensor(weights0:size()):copy(weights0)
+                    --print("weights  size",weights:size())
+
+                    --plp.dump(weights[289])
+                    weight_word=torch.CudaTensor()
+                    for j =  1, sample.source:size(1) do
+                        --print(sample.source[j])
+                        --print('weights[sample.source[j]] size',weights[sample.source[j]]:size())
+                       local s=sample.source[j]
+                       --print(s[1])
+                       local tweight = weights[s[1]] 
+                       --print(tweight:size())
+                       weight_word=weight_word:cat(tweight,2)
+                    end 
+                    weight_word = weight_word:t()
+                    --print(weight_word:size())
+                    return table.pack(weight_word)
+                    --encoderout = encoder:forward({sample.source, sample.sourcePos})
+                    --print('ok')
+                    --return encoderout
                     
                     --conv1 = callbacks[i].decode(states[i], targetIns[i],2)
                     --return conv1

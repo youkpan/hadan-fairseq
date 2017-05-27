@@ -6,4 +6,4 @@ export CUDA_VISIBLE_DEVICES=0
 
 th train.lua -sourcelang zh -targetlang en -datadir data-bin/iwslt14.tokenized.zh-en \
   -model fconv -nenclayer 4 -batchsize 12 -nlayer 3 -dropout 0.2 -optim nag -lr 0.25 -clip 0.1 \
-  -momentum 0.99 -timeavg -bptt 0 -savedir trainings/fconvzh -ngpus 1
+  -momentum 0.99 -timeavg -bptt 0 -savedir trainings/fconvzh-embed -ngpus 1

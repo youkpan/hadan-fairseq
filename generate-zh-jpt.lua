@@ -22,10 +22,9 @@ local data = require 'fairseq.torchnet.data'
 local search = require 'fairseq.search'
 local tokenizer = require 'fairseq.text.tokenizer'
 local mutils = require 'fairseq.models.utils'
-
+--[[
 local cmd = torch.CmdLine()
 cmd:option('-path', 'model1.th7,model2.th7', 'path to saved model(s)')
-cmd:option('-path2', 'model1.th7,model2.th7', 'path to saved model(s)')
 cmd:option('-beam', 1, 'search beam width')
 cmd:option('-lenpen', 1,
     'length penalty: <1.0 favors shorter, >1.0 favors longer sentences')
@@ -54,6 +53,14 @@ cmd:option('-freqthreshold', -1,
 cmd:option('-fconvfast', false, 'make fconv model faster')
 
 local config = cmd:parse(arg)
+ ]]
+local config={}
+local path1 = 'trainings/fconvzh/'
+config.sourcedict = path1..'dict.zh.th7'
+config.targetdict = path1..'dict.en.th7'
+config.path = path1..'model_best_opt.th7'
+config.beam = 4
+config.nbest = 1
 
 -------------------------------------------------------------------
 -- Load data
@@ -162,22 +169,6 @@ else
         end
         assert(nfconv > 0, '-fconvfast requires an fconv model in the ensemble')
     end
-
-    model2 = require(
-        'fairseq.models.ensemble_model'
-    ).new(config)
-
-    --print(config)
-    config.nhids = {}
-    config.kwidths = {}
-    
-    --config.usemodel = 4
-    print(config.model ,config.kwidths)
-    config.attnlayers = 0
-
-    model4 = require(
-        'fairseq.models.ensemble_model'
-    ).new(config)
 end
 
 local vocab = nil
@@ -206,18 +197,6 @@ local searchf = search.beam{
     coveragePenalty = config.covpen,
     vocab = vocab,
 }
-local searchf_src = search.beam{
-    ttype = model:type(),
-    dict = config.dict,
-    srcdict = config.srcdict,
-    beam = config.beam,
-    lenPenalty = config.lenpen,
-    unkPenalty = config.unkpen,
-    subwordPenalty = config.subwordpen,
-    coveragePenalty = config.covpen,
-    vocab = vocab,
-}
-
 
 if config.visdom ~= '' then
     local host, port = table.unpack(plstringx.split(config.visdom, ':'))
@@ -261,11 +240,10 @@ plp = require('pl.pretty')
 for sample in dataset() do
     sample.bsz = 1
     
-    local conv = model2:generate(config, sample, searchf ,2 ,torch.CudaTensor(1))
-    --print("conv[1] size",conv[1]:size())
-    --print(conv)
+    local conv = model:generate(config, sample, searchf ,2,torch.CudaTensor(0))
+
     for k,v in pairs(conv) do
-        --print(k," conv:size",v:size(1),v:size(2),v:size(3))
+        print(k," conv:size",v:size(1),v:size(2),v:size(3))
     end
 
     -- Print results
@@ -311,7 +289,7 @@ for sample in dataset() do
         --print("sentence_v get")
     end
     --print(sentence_v2)
-    --print(sentence_v2:size())
+    print(sentence_v2:size())
     --print(img2)
     --img2 = image.scale(sentence_v,16*40,16*40)
     --path1=string.format('/home/pan/fairseq/s_%s_p_%d_%s.jpg',testi,i,words)
@@ -336,50 +314,21 @@ for sample in dataset() do
     --]]
 
     sentence_v2:resize(1,sentence_len+1,256)
-    --image.savePGM(path1,sentence_v2)
+    image.savePGM(path1,sentence_v2)
 
-    --io.stdout:flush()
-    --print(sample.source)
-    local ts = sample.source
-    local attnlayers = config.attnlayers
-    local utils = require 'fairseq.utils'
-
-    local hypos_s  = model4:generate(config, sample, searchf_src , 4 , conv[1])
-    config.attnlayers =attnlayers
-    --plp.dump(hypos_s)
-    canshow = 1
-    for i = 1, hypos_s:size(1) do
-       if hypos_s[i] > config.srcdict:size() or  hypos_s[i] <=0  then
-            canshow = 0
-            hypos_s[i] = 1
-        end
-    end
-
-    if canshow ==1 then
-        sourceString2 = config.srcdict:getString(hypos_s):gsub(eos .. '.*', '')
-        sourceString2 = sourceString2:gsub(seos .. '.*', '')
-        sstr = ""
-        for i=1,hypos_s:size(1) do
-            tt= string.format("%d",hypos_s[i])
-            sstr = sstr..tt.." "
-        end
-        print("I",sstr)
-        print('B', sourceString2)
-    end
-
-    sample.source=ts
-
-    local hypos, scores, attns = model:generate(config, sample, searchf , 0 ,torch.CudaTensor(1))
+    io.stdout:flush()
+    collectgarbage()
+    
+--[[
+    local hypos, scores, attns = model:generate(config, sample, searchf , 0)
     local sstr=''
     --print(sample.source)
 
-    
     for i=1,sample.source:size(1) do
         tt= string.format("%d",sample.source[i][1])
         sstr = sstr..tt.." "
     end
     print("I",sstr)
-    
     print('O', sample.text)
 
     for i = 1, math.min(config.nbest, config.beam) do
@@ -392,5 +341,5 @@ for sample in dataset() do
     end
 
     io.stdout:flush()
-    
+    --]]
 end

@@ -396,7 +396,7 @@ FConvModel.makeEncoder = argcheck{
         local nattn = #attentionLayers(#config.nlmhids, config.attnlayers)
         cnn = nn.GradMultiply(cnn, 1 / (2 * nattn))
 
-        local outputA = cnn(embed)
+        local outputA = cnn(embed):annotate{name='encoder_cnn'}
         -- Source feeding for weighted sum in attention: add embeddings to CNN
         -- output
         local outputC = nn.CAddTableMulConstant(
