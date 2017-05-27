@@ -18,6 +18,9 @@ fix get hidden layer problem ,and works well :)
 anyone find new way improve predict the vector and back to word is welcome. 
 my email is youkpan@gmail.com
 
+train file , 170MB of Chinese novel wuxia allbook.txt.xz download： 
+[hayoou.com/x31u](http://hayoou.com/x31u)
+
  -------
  ```
  taining/fconvzh-back is the generate back word model
@@ -28,7 +31,8 @@ my email is youkpan@gmail.com
 
  using generateback.sh to get predict words
 
- not finised all, todo: eval tensorflow - > genertaback 
+ nearly finised  todo: eval tensorflow - > genertaback  online
+
 ```
 
 -----install
@@ -38,10 +42,6 @@ my email is youkpan@gmail.com
  then get chinese dataset
  remenber to change ratio 175 in data/prepare-iwslt14.sh  
  for max speed limit the sentence len 75
-
-
-train file of  170MB of Chinese novel wuxia allbook.txt.xz download： 
-(hayoou.com/x31u](http://hayoou.com/x31u)
 
 
  our early work :
