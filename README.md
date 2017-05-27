@@ -14,8 +14,9 @@ but now facing a problem ,we can't access the hidden layer of dictionary.
 we just using a hack way to get the word vector , it can work,
 but not good .only predict some word like 'is' 'me' .
 
-someone knows how to get the layer param and the way improve the vector to word method
- please let me know . youkpan@gmail.com
+fix get hidden layer problem ,and works well :)
+anyone find new way improve predict the vector and back to word is welcome. 
+my email is youkpan@gmail.com
 
  -------
  ```
@@ -31,10 +32,16 @@ someone knows how to get the layer param and the way improve the vector to word 
 ```
 
 -----install
- first you should get the fairseq: https://github.com/facebookresearch/fairseq
+
+ first you should get the fairseq: 
+ https://github.com/facebookresearch/fairseq
  then get chinese dataset
  remenber to change ratio 175 in data/prepare-iwslt14.sh  
  for max speed limit the sentence len 75
+
+
+train file of  170MB of Chinese novel wuxia allbook.txt.xz download： 
+(hayoou.com/x31u](http://hayoou.com/x31u)
 
 
  our early work :
